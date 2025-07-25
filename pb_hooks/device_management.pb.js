@@ -1,9 +1,9 @@
-/// Device Management Hook - Proper PocketBase Syntax
-/// Based on official PocketBase JavaScript Event Hooks documentation
+/// Device Management Hook - Correct PocketBase Syntax
 /// Automatically handles device duplicate cleanup server-side
+/// Only runs when api_devices are created AND duplicates exist
 
-// Hook for handling device record creation - runs after device is created
-onRecordAfterCreateRequest((e) => {
+// Hook for successful device record creation
+onRecordAfterCreateSuccess((e) => {
     console.log("🔧 Device creation hook triggered for device:", e.record.getId())
     
     try {
@@ -11,6 +11,7 @@ onRecordAfterCreateRequest((e) => {
         const deviceFingerprint = newDevice.get("device_fingerprint")
         const newUserId = newDevice.get("user_id")
         
+        // Early exit if no fingerprint - can't check for duplicates
         if (!deviceFingerprint) {
             console.log("⚠️ No device fingerprint found, skipping duplicate check")
             e.next()
@@ -32,19 +33,20 @@ onRecordAfterCreateRequest((e) => {
             }
         )
         
+        // Early exit if no duplicates found - this is the normal case
         if (existingDevices.length === 0) {
-            console.log("✅ No duplicate devices found")
+            console.log("✅ No duplicate devices found - normal device creation")
             e.next()
             return
         }
         
+        // Only cleanup if duplicates actually exist
         console.log("⚠️ Found", existingDevices.length, "duplicate device(s), cleaning up...")
         
-        // Determine which device should be the primary one
+        // Find the most recently used device among all duplicates
         let primaryDevice = newDevice
         let primaryActivity = newDevice.get("last_used") || newDevice.get("created") || new Date()
         
-        // Find the most recently used device among all duplicates
         for (let device of existingDevices) {
             const deviceActivity = device.get("last_activity") || device.get("last_used") || device.get("created")
             if (new Date(deviceActivity) > new Date(primaryActivity)) {
@@ -109,6 +111,6 @@ onRecordAfterCreateRequest((e) => {
     // Always call e.next() to continue the hook execution chain
     e.next()
     
-}, "api_devices") // Scope this hook only to api_devices collection
+}, "api_devices") // ONLY triggers on api_devices collection
 
 console.log("🔧 Device management hook loaded successfully")
